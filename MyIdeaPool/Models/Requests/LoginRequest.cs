@@ -5,7 +5,7 @@ using System.Runtime.Serialization;
 namespace MyIdeaPool.Models.Requests
 {
     [DataContract]
-    public class LoginCredentials
+    public class LoginRequest
     {
         [Required]
         [DataMember]

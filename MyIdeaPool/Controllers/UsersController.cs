@@ -42,7 +42,7 @@ namespace MyIdeaPool.Controllers
 
         // POST access-tokens
         [HttpPost("access-tokens")]
-        public ActionResult<TokenResponse> Login(LoginCredentials credentials)
+        public ActionResult<TokenResponse> Login(LoginRequest credentials)
         {
             User user = Authenticate(credentials);
             if (user != null)
@@ -73,7 +73,7 @@ namespace MyIdeaPool.Controllers
             return Ok();
         }
 
-        private User Authenticate(LoginCredentials credentials)
+        private User Authenticate(LoginRequest credentials)
         {
             return new User()
             {
