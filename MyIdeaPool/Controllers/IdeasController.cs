@@ -47,7 +47,8 @@ namespace MyIdeaPool.Controllers
             if (request.Confidence < 1 || request.Confidence > 10) return BadRequest("Confidence must be between 1 and 10.");
 
             // Get the user's ID from the claims.
-            var userId = HttpContext.User.Claims.First(c => c.Type.Equals("user_id")).Value;
+            var userIdString = HttpContext.User.Claims.First(c => c.Type.Equals("user_id")).Value;
+            int userId = int.Parse(userIdString);
 
             // TODO We should add to the specific user's ideas.
             var idea = new Idea()

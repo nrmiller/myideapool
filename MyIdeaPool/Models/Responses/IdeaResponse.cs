@@ -28,7 +28,7 @@ namespace MyIdeaPool.Models.Responses
         public int Confidence { get; }
 
         [DataMember(Name = "average_score")]
-        public double AverageScorce
+        public double AverageScore
         {
             get
             {

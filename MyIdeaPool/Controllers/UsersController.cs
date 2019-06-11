@@ -2,13 +2,14 @@
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
@@ -50,7 +51,7 @@ namespace MyIdeaPool.Controllers
             }
 
             // Check if account already exists.
-            bool accountExists = dbContext.Users.Any(user => user.Email.Equals(request.Email, StringComparison.OrdinalIgnoreCase));
+            bool accountExists = await dbContext.Users.AnyAsync(user => user.Email.Equals(request.Email, StringComparison.OrdinalIgnoreCase));
             if (accountExists)
             {
                 return BadRequest("Cannot create user! Account already exists.");
@@ -64,24 +65,27 @@ namespace MyIdeaPool.Controllers
             {
                 Email = request.Email,
                 Name = request.Name,
+                AvatarUrl = GenerateGravatarUrl(request.Email),
                 Salt = salt.ToHexString(),
                 SaltedPasswordHash = saltedHash.ToHexString()
             };
 
+            // Save the user so we can retrieve the ID.
             dbContext.Users.Add(newUser);
             await dbContext.SaveChangesAsync();
 
-            TokenResponse token = new TokenResponse()
+
+            TokenResponse response = new TokenResponse()
             {
                 Token = CreateTokenFor(newUser),
-                RefreshToken = JwtTokenHelper.GenerateRefreshToken()
+                RefreshToken = await GenerateUniqueRefreshToken()
             };
 
             // Remember to persist the refresh token:
-            newUser.RefreshToken = token.RefreshToken;
+            newUser.RefreshToken = response.RefreshToken;
             await dbContext.SaveChangesAsync();
 
-            return Ok(token);
+            return Ok(response);
         }
 
         private (bool success, string error) ValidatePassword(string password)
@@ -103,7 +107,7 @@ namespace MyIdeaPool.Controllers
         public async Task<ActionResult<TokenResponse>> Login(LoginRequest credentials)
         {
             // Check if account already exists.
-            User user = dbContext.Users.FirstOrDefault(it => it.Email.Equals(credentials.Email, StringComparison.OrdinalIgnoreCase));
+            User user = await dbContext.Users.FirstOrDefaultAsync(it => it.Email.Equals(credentials.Email, StringComparison.OrdinalIgnoreCase));
             if (user == null)
             {
                 return Unauthorized();
@@ -114,31 +118,111 @@ namespace MyIdeaPool.Controllers
             {
                 return Unauthorized();
             }
-
-            TokenResponse token = new TokenResponse()
+            
+            TokenResponse response = new TokenResponse()
             {
                 Token = CreateTokenFor(user),
-                RefreshToken = JwtTokenHelper.GenerateRefreshToken()
+                RefreshToken = await GenerateUniqueRefreshToken()
             };
-
-            user.RefreshToken = token.RefreshToken;
+            
+            user.RefreshToken = response.RefreshToken;
             await dbContext.SaveChangesAsync();
 
-            return token;
+            return response;
         }
 
         // DELETE access-tokens
         [HttpDelete("access-tokens")]
-        public IActionResult Logout(TokenResponse refreshToken)
+        public async Task<IActionResult> Logout(LogoutRequest request)
         {
-            return Ok();
+            // Authenticate requester.
+            var jwtToken = Request.Headers["X-Access-Token"];
+            if (!tokenHelper.ValidateJwtToken(jwtToken, out SecurityToken validatedToken))
+            {
+                return Unauthorized();
+            }
+
+            // Get the user's ID from the claims.
+            var userIdString = HttpContext.User.Claims.First(c => c.Type.Equals("user_id")).Value;
+            int userId = int.Parse(userIdString);
+            User user = await dbContext.Users.FindAsync(userId);
+
+            if (!user.RefreshToken.Equals(request.RefreshToken))
+            {
+                // The JWT bearer had a valid JWT; however, they did not
+                // have the appropriate refresh token.
+
+                // Important Security Note:
+                // The server shall not respond conditionally upon the request.
+                // Otherwise, a malicious client can determine which refresh
+                // tokens are not valid, narrowing the space of valid tokens
+                // to search from.
+                // Since in this case the client must also be a JWT bearer,
+                // they have a relatively short window to eliminate posible
+                // refresh tokens.
+                return NoContent();
+            }
+
+            // Delete the refresh token.
+            user.RefreshToken = null;
+
+            await dbContext.SaveChangesAsync();
+
+            return NoContent();
         }
+
+
+        [HttpGet("me")]
+        public async Task<IActionResult> GetUserInfo()
+        {
+            // Authenticate requester.
+            var jwtToken = Request.Headers["X-Access-Token"];
+            if (!tokenHelper.ValidateJwtToken(jwtToken, out SecurityToken validatedToken))
+            {
+                return Unauthorized();
+            }
+
+            // Get the user's ID from the claims.
+            var userIdString = HttpContext.User.Claims.First(c => c.Type.Equals("user_id")).Value;
+            int userId = int.Parse(userIdString);
+            User user = await dbContext.Users.FindAsync(userId);
+
+            UserInfoResponse response = new UserInfoResponse()
+            {
+                Email = user.Email,
+                Name = user.Name,
+                AvatarUrl = user.AvatarUrl
+            };
+
+            return Ok(response);
+        }
+
 
         // POST access-tokens/refresh
         [HttpPost("access-tokens/refresh")]
-        public IActionResult Refresh(TokenResponse refreshToken)
+        public async Task<IActionResult> Refresh(RefreshRequest request)
         {
-            return Ok();
+            User user = await dbContext.Users.FirstOrDefaultAsync(it => it.RefreshToken.Equals(request.RefreshToken, StringComparison.OrdinalIgnoreCase));
+            if (user == null)
+            {
+                // The refresh token present by the client is invalid.
+                return Unauthorized();
+            }
+
+            // The refresh token was accepted.
+            // Security Note: We don't need to regenerate the refresh token
+            // since the owner has already been authenticated.
+            // An impersonating JWT bearer will only have access util token
+            // expiry.
+            // The JWT bearer will only have the refresh token under
+            // the scenario that they have the account credentials.
+
+            RefreshResponse response = new RefreshResponse()
+            {
+                Token = CreateTokenFor(user)
+            };
+
+            return Ok(response);
         }
 
         private bool Authenticate(LoginRequest credentials, User user)
@@ -160,12 +244,37 @@ namespace MyIdeaPool.Controllers
                 claims: new List<Claim>()
                 {
                     // Add the user's ID as a claim.
-                    new Claim("user_id", user.Id.ToString())
+                    new Claim("user_id", user.Id.ToString()),
                 },
                 expires: DateTime.UtcNow.AddMinutes(10),
                 signingCredentials: signingCredentials);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        private async Task<string> GenerateUniqueRefreshToken()
+        {
+            do
+            {
+                string refreshToken = JwtTokenHelper.GenerateRefreshToken();
+                bool foundMatch = await dbContext.Users.AnyAsync((User it) => it.RefreshToken != null && it.RefreshToken.Equals(refreshToken));
+                if (!foundMatch)
+                {
+                    return refreshToken;
+                }
+
+            } while (true);
+        }
+
+        private string GenerateGravatarUrl(string email)
+        {
+            using (var md5 = MD5.Create())
+            {
+                string sanitizedEmail = email.Trim().ToLower();
+                byte[] emailBytes = Encoding.UTF8.GetBytes(sanitizedEmail);
+                byte[] hash = md5.ComputeHash(emailBytes);
+                return $"https://www.gravatar.com/avatar/{hash.ToHexString()}";
+            }
         }
     }
 }

@@ -12,7 +12,7 @@ namespace MyIdeaPool.Models
         // Profile-related:
         public string Name { get; set; }
         public string Email { get; set; }
-        public string GravatarUrl { get; set; }
+        public string AvatarUrl { get; set; }
 
         // Security-related:
         public string Salt { get; set; }
