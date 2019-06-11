@@ -20,12 +20,12 @@ namespace MyIdeaPool.Controllers
     [ApiController]
     public class IdeasController : ControllerBase
     {
-        private readonly IdeaContext context;
+        private readonly IdeaPoolContext dbContext;
         private readonly JwtTokenHelper tokenHelper;
 
-        public IdeasController(IdeaContext context, JwtTokenHelper tokenHelper)
+        public IdeasController(IdeaPoolContext dbContext, JwtTokenHelper tokenHelper)
         {
-            this.context = context;
+            this.dbContext = dbContext;
             this.tokenHelper = tokenHelper;
         }
 
@@ -59,8 +59,8 @@ namespace MyIdeaPool.Controllers
                 Confidence = (int)request.Confidence,
                 CreatedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
             };
-            context.Ideas.Add(idea);
-            await context.SaveChangesAsync();
+            dbContext.Ideas.Add(idea);
+            await dbContext.SaveChangesAsync();
 
             var response = new IdeaResponse(idea.Id, idea.Content, idea.Impact, idea.Ease, idea.Confidence, idea.CreatedAt);
             return CreatedAtAction(nameof(GetIdeas), response);
@@ -77,7 +77,7 @@ namespace MyIdeaPool.Controllers
                 return Unauthorized();
             }
 
-            var idea = await context.Ideas.FindAsync(id);
+            var idea = await dbContext.Ideas.FindAsync(id);
 
             if (idea == null)
             {
@@ -85,8 +85,8 @@ namespace MyIdeaPool.Controllers
             }
 
             // TODO We should delete from the specific user's ideas.
-            context.Remove(idea);
-            await context.SaveChangesAsync();
+            dbContext.Remove(idea);
+            await dbContext.SaveChangesAsync();
 
             return NoContent();
         }
@@ -108,7 +108,7 @@ namespace MyIdeaPool.Controllers
             int entriesToSkip = (page - 1) * 10;
 
             // TODO Get ideas from specific user.
-            return await context.Ideas.Skip(entriesToSkip).Take(10).ToListAsync();
+            return await dbContext.Ideas.Skip(entriesToSkip).Take(10).ToListAsync();
         }
 
         // PUT ideas/n
@@ -121,7 +121,7 @@ namespace MyIdeaPool.Controllers
                 return Unauthorized();
             }
 
-            var idea = await context.Ideas.FindAsync(id);
+            var idea = await dbContext.Ideas.FindAsync(id);
 
             // Copy request parameters.
             idea.Content = request.Content;
@@ -130,8 +130,8 @@ namespace MyIdeaPool.Controllers
             idea.Confidence = (int)request.Confidence;
 
             // TODO Update the idea for the specific user.
-            context.Entry(idea).State = EntityState.Modified;
-            await context.SaveChangesAsync();
+            dbContext.Entry(idea).State = EntityState.Modified;
+            await dbContext.SaveChangesAsync();
 
             return NoContent();
         }

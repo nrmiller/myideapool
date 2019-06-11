@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -60,6 +61,23 @@ namespace MyIdeaPool
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Creates a long-lived refresh token that can only be used.
+        /// The refresh token is URL-safe.
+        /// </summary>
+        /// <returns>The refresh token.</returns>
+        public static string GenerateRefreshToken()
+        {
+            // Use a CSRNG to get 32 bytes.
+            var refreshTokenBytes = new byte[32];
+            using (var rng = RandomNumberGenerator.Create())
+            {
+                rng.GetBytes(refreshTokenBytes);
+
+                return refreshTokenBytes.ToHexString();
+            }
         }
     }
 }

@@ -54,9 +54,9 @@ namespace MyIdeaPool
             */
 
             services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
-            services.AddScoped(sp => sp.GetRequiredService<IHttpContextAccessor>().HttpContext);
+            //services.AddScoped(sp => sp.GetRequiredService<IHttpContextAccessor>().HttpContext);
             services.AddScoped<JwtTokenHelper>();
-            services.AddDbContext<IdeaContext>(opt => opt.UseInMemoryDatabase(databaseName: "ideas_database"));
+            services.AddDbContext<IdeaPoolContext>(opt => opt.UseInMemoryDatabase(databaseName: "ideas_database"));
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
         }
 

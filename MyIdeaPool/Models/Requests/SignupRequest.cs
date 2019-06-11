@@ -13,8 +13,8 @@ namespace MyIdeaPool.Models.Requests
         public string Email { get; set; }
 
         [Required]
-        [DataMember(Name = "name")]
-        public string FullName { get; set; }
+        [DataMember]
+        public string Name { get; set; }
 
         [Required]
         [DataMember]
