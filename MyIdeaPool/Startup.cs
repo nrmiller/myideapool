@@ -28,33 +28,7 @@ namespace MyIdeaPool
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            //services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            //.AddJwtBearer(options =>
-            //{
-            //    options.TokenValidationParameters = new TokenValidationParameters()
-            //    {
-            //        ValidateIssuer = true, // Validate the server that issued the token.
-            //        ValidateAudience = true, // Validate that the audience is authorized to receive the token.
-            //        ValidateLifetime = true, // Validate that the token is not expired.
-            //        ValidateIssuerSigningKey = true, // Validate the issuer's signing key.
-            //        ValidIssuer = Configuration["Jwt:Issuer"], // JWT is issued by the ASP.NET webserver.
-            //        ValidAudience = Configuration["Jwt:Issuer"], // ASP.NET webserver processes the JWT on requests.
-            //        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Configuration["Jwt:Key"]))
-            //    };
-            //});
-            /*
-            services.AddDefaultIdentity<User>();
-            services.Configure<IdentityOptions>(options =>
-            {
-                options.Password.RequiredLength = 8;        // Must contain at least 8 characters.
-                options.Password.RequireUppercase = true;   // Must contain at least 1 uppercase letter.
-                options.Password.RequireLowercase = true;   // Must contain at least 1 lowercase letter.
-                options.Password.RequireDigit = true;       // Must contain at least 1 number.
-            });
-            */
-
             services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
-            //services.AddScoped(sp => sp.GetRequiredService<IHttpContextAccessor>().HttpContext);
             services.AddScoped<JwtTokenHelper>();
             services.AddDbContext<IdeaPoolContext>(opt => opt.UseInMemoryDatabase(databaseName: "ideas_database"));
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
@@ -69,14 +43,11 @@ namespace MyIdeaPool
             }
             else
             {
-                app.UseHsts();
+                //app.UseHsts();
             }
 
-            app.UseHttpsRedirection();
+            //app.UseHttpsRedirection();
 
-            // We are not using ASP.NET framework for authentication as we need
-            // to grab the JWT from the X-Access-Token request header.
-            //app.UseAuthentication();
             app.UseMvc();
         }
     }

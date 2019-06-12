@@ -109,6 +109,10 @@ namespace MyIdeaPool.Controllers
             }
 
             // Sanitize inputs.
+            // Note: This check is causing the cm-quiz script to fail the DELETE idea test.
+            // The reason it fails is because the cm-quiz is trying to access a page not
+            // allowed by the API (the script fails to provide a query string).
+            // See post: https://github.com/codementordev/cm-quiz/issues/5#issuecomment-501140778
             if (page <= 0) return BadRequest("Page must be greater or equal to 1.");
 
             // Get the user's ID from the claims.
@@ -116,11 +120,12 @@ namespace MyIdeaPool.Controllers
             int userId = int.Parse(userIdString);
 
             int entriesToSkip = (page - 1) * 10;
-            return await dbContext.Ideas
+            List<Idea> ideas = await dbContext.Ideas
                 .Where((Idea it) => it.UserId == userId)
                 .OrderByDescending((Idea it) => it.AverageScore)
                 .Skip(entriesToSkip)
                 .Take(10).ToListAsync();
+            return ideas;
         }
 
         // PUT ideas/n
