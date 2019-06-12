@@ -1,18 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using MyIdeaPool.Models;
 using MyIdeaPool.Models.Requests;
 using MyIdeaPool.Models.Responses;
-
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace MyIdeaPool.Controllers
 {
@@ -50,16 +45,17 @@ namespace MyIdeaPool.Controllers
             var userIdString = HttpContext.User.Claims.First(c => c.Type.Equals("user_id")).Value;
             int userId = int.Parse(userIdString);
 
-            // TODO We should add to the specific user's ideas.
             var idea = new Idea()
             {
-                Id = "af08b7c9d3f",
+                Id = await GenerateUniqueId(userId),
+                UserId = userId,
                 Content = request.Content,
                 Impact = (int)request.Impact,
                 Ease = (int)request.Ease,
                 Confidence = (int)request.Confidence,
                 CreatedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
             };
+
             dbContext.Ideas.Add(idea);
             await dbContext.SaveChangesAsync();
 
@@ -67,7 +63,7 @@ namespace MyIdeaPool.Controllers
             return CreatedAtAction(nameof(GetIdeas), response);
         }
 
-        // DELETE api/ideas/n
+        // DELETE ideas/n
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)
         {
@@ -85,7 +81,16 @@ namespace MyIdeaPool.Controllers
                 return NotFound();
             }
 
-            // TODO We should delete from the specific user's ideas.
+            // Get the user's ID from the claims.
+            var userIdString = HttpContext.User.Claims.First(c => c.Type.Equals("user_id")).Value;
+            int userId = int.Parse(userIdString);
+
+            // Users are only allowed to delete their own ideas.
+            if (idea.UserId != userId)
+            {
+                return Unauthorized();
+            }
+
             dbContext.Remove(idea);
             await dbContext.SaveChangesAsync();
 
@@ -106,23 +111,46 @@ namespace MyIdeaPool.Controllers
             // Sanitize inputs.
             if (page <= 0) return BadRequest("Page must be greater or equal to 1.");
 
-            int entriesToSkip = (page - 1) * 10;
+            // Get the user's ID from the claims.
+            var userIdString = HttpContext.User.Claims.First(c => c.Type.Equals("user_id")).Value;
+            int userId = int.Parse(userIdString);
 
-            // TODO Get ideas from specific user.
-            return await dbContext.Ideas.Skip(entriesToSkip).Take(10).ToListAsync();
+            int entriesToSkip = (page - 1) * 10;
+            return await dbContext.Ideas
+                .Where((Idea it) => it.UserId == userId)
+                .OrderByDescending((Idea it) => it.AverageScore)
+                .Skip(entriesToSkip)
+                .Take(10).ToListAsync();
         }
 
         // PUT ideas/n
         [HttpPut("{id}")]
-        public async Task<IActionResult> Put(string id, IdeaRequest request)
+        public async Task<IActionResult> UpdateIdea(string id, IdeaRequest request)
         {
+            // Authenticate requester.
             var jwtToken = Request.Headers["X-Access-Token"];
             if (!tokenHelper.ValidateJwtToken(jwtToken, out SecurityToken validatedToken))
             {
                 return Unauthorized();
             }
 
+            // Sanitize inputs.
+            if (request.Content.Length > 255) return BadRequest("Content cannot exceed 255 characters.");
+            if (request.Impact < 1 || request.Impact > 10) return BadRequest("Impact must be between 1 and 10.");
+            if (request.Ease < 1 || request.Ease > 10) return BadRequest("Ease must be between 1 and 10.");
+            if (request.Confidence < 1 || request.Confidence > 10) return BadRequest("Confidence must be between 1 and 10.");
+
             var idea = await dbContext.Ideas.FindAsync(id);
+
+            // Get the user's ID from the claims.
+            var userIdString = HttpContext.User.Claims.First(c => c.Type.Equals("user_id")).Value;
+            int userId = int.Parse(userIdString);
+
+            // Users are only allowed to update their own ideas.
+            if (idea.UserId != userId)
+            {
+                return Unauthorized();
+            }
 
             // Copy request parameters.
             idea.Content = request.Content;
@@ -130,11 +158,27 @@ namespace MyIdeaPool.Controllers
             idea.Ease = (int)request.Ease;
             idea.Confidence = (int)request.Confidence;
 
-            // TODO Update the idea for the specific user.
             dbContext.Entry(idea).State = EntityState.Modified;
             await dbContext.SaveChangesAsync();
 
-            return NoContent();
+            var response = new IdeaResponse(idea.Id, idea.Content, idea.Impact, idea.Ease, idea.Confidence, idea.CreatedAt);
+            return Ok(response);
+        }
+
+        private async Task<string> GenerateUniqueId(int userId)
+        {
+            do
+            {
+                string genId = UrlHelper.GenerateRandomUrl(16);
+                bool foundMatch = await dbContext.Ideas
+                    .Where((Idea it) => it.UserId == userId)
+                    .AnyAsync((Idea it) => it.Id == genId);
+                if (!foundMatch)
+                {
+                    return genId;
+                }
+
+            } while (true);
         }
     }
 }

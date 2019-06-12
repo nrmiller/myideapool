@@ -17,6 +17,16 @@ namespace MyIdeaPool.Models
         public int Impact { get; set; }
         public int Ease { get; set; }
         public int Confidence { get; set; }
+
+        [NotMapped]
+        public double AverageScore
+        {
+            get
+            {
+                return (Impact + Ease + Confidence) / 3.0d;
+            }
+        }
+
         public long CreatedAt { get; set; }
     }
 }
