@@ -13,7 +13,7 @@ namespace MyIdeaPool.Models.Responses
         public string Email { get; set; }
         [DataMember]
         public string Name { get; set; }
-        [DataMember]
+        [DataMember(Name = "avatar_url")]
         public string AvatarUrl { get; set; }
     }
 }

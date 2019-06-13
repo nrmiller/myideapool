@@ -1,23 +1,21 @@
-﻿using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
-using System.Security.Claims;
-using System.Text;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Builder;
+﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.IdentityModel.Tokens;
+using MyIdeaPool.Tools;
 using MyIdeaPool.Models;
 
 namespace MyIdeaPool
 {
     public class Startup
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="T:MyIdeaPool.Startup"/> class.
+        /// </summary>
+        /// <param name="configuration">Configuration.</param>
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
@@ -43,9 +41,11 @@ namespace MyIdeaPool
             }
             else
             {
+                // Not using HTTPS/SSL
                 //app.UseHsts();
             }
 
+            // Not using HTTPS/SSL
             //app.UseHttpsRedirection();
 
             app.UseMvc();

@@ -7,7 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 
-namespace MyIdeaPool
+namespace MyIdeaPool.Tools
 {
     public class JwtTokenHelper
     {

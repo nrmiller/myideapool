@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Security.Cryptography;
 
-namespace MyIdeaPool
+namespace MyIdeaPool.Tools
 {
     public static class UrlHelper
     {

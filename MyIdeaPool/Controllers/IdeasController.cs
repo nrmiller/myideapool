@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using MyIdeaPool.Tools;
 using MyIdeaPool.Models;
 using MyIdeaPool.Models.Requests;
 using MyIdeaPool.Models.Responses;
@@ -75,7 +76,6 @@ namespace MyIdeaPool.Controllers
             }
 
             var idea = await dbContext.Ideas.FindAsync(id);
-
             if (idea == null)
             {
                 return NotFound();
@@ -163,6 +163,7 @@ namespace MyIdeaPool.Controllers
             idea.Ease = (int)request.Ease;
             idea.Confidence = (int)request.Confidence;
 
+            // Attach idea to context and save.
             dbContext.Entry(idea).State = EntityState.Modified;
             await dbContext.SaveChangesAsync();
 

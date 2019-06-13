@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
+using MyIdeaPool.Tools;
 using MyIdeaPool.Models;
 using MyIdeaPool.Models.Requests;
 using MyIdeaPool.Models.Responses;
@@ -84,7 +85,7 @@ namespace MyIdeaPool.Controllers
             newUser.RefreshToken = response.RefreshToken;
             await dbContext.SaveChangesAsync();
 
-            return Ok(response);
+            return CreatedAtAction(nameof(GetUserInfo), response);
         }
 
         private (bool success, string error) ValidatePassword(string password)
@@ -109,12 +110,14 @@ namespace MyIdeaPool.Controllers
             User user = await dbContext.Users.FirstOrDefaultAsync(it => it.Email.Equals(credentials.Email, StringComparison.OrdinalIgnoreCase));
             if (user == null)
             {
+                // User doesn't exist.
                 return Unauthorized();
             }
 
             bool isAuthenticated = Authenticate(credentials, user);
             if (!isAuthenticated)
             {
+                // User and password do not match.
                 return Unauthorized();
             }
             
@@ -123,11 +126,13 @@ namespace MyIdeaPool.Controllers
                 Token = CreateTokenFor(user),
                 RefreshToken = await GenerateUniqueRefreshToken()
             };
-            
+
+            // Save the refresh refresh token so we can later verify
+            // the client in case the JWT expires.
             user.RefreshToken = response.RefreshToken;
             await dbContext.SaveChangesAsync();
 
-            return response;
+            return CreatedAtAction(nameof(GetUserInfo), response);
         }
 
         // DELETE access-tokens
@@ -146,6 +151,7 @@ namespace MyIdeaPool.Controllers
             int userId = int.Parse(userIdString);
             User user = await dbContext.Users.FindAsync(userId);
 
+            // Make sure the JWT bearer owns the refresh token.
             if (!user.RefreshToken.Equals(request.RefreshToken))
             {
                 // The JWT bearer had a valid JWT; however, they did not
@@ -204,7 +210,7 @@ namespace MyIdeaPool.Controllers
             User user = await dbContext.Users.FirstOrDefaultAsync(it => it.RefreshToken.Equals(request.RefreshToken, StringComparison.OrdinalIgnoreCase));
             if (user == null)
             {
-                // The refresh token present by the client is invalid.
+                // The refresh token presented by the client is invalid.
                 return Unauthorized();
             }
 
@@ -259,9 +265,9 @@ namespace MyIdeaPool.Controllers
                 bool foundMatch = await dbContext.Users.AnyAsync((User it) => it.RefreshToken != null && it.RefreshToken.Equals(refreshToken));
                 if (!foundMatch)
                 {
+                    // Generated token was not already assigned to any user.
                     return refreshToken;
                 }
-
             } while (true);
         }
 
